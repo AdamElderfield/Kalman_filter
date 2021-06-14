@@ -1,10 +1,9 @@
 using Base: thread_notifiers
 # Kalman filter exact initialisation 
 
-#using Pkg
-#using DataFrames
-#dusing Optim 
-#using LinearAlgebra
+using DataFrames
+using Optim 
+using LinearAlgebra
 
 # ---------------------------------------------------------
 # Function 1 - initialisation
@@ -68,13 +67,17 @@ end
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # ξ_t = Fξ_(t-1) + w_t
 # y_t = A'x_t + H'ξ_t + v_t
+# Assumes states have been initialised
 
-function KalmanFilter!(m::dlm,y,x)
-    
+function KalmanFilter!(m::dlm,y::AbstractArray,x::AbstractArray)
+
+ 
     FF, A, H, X, Q = m.FF, m.A, m.H, m.Q
     ξ_p1 , Σ_pi = m.cur_ξ_hat, m.cur_Σ_hat 
 
-     
+    # Number of time periods
+    bigT = size(y,1)
+         
     # ******************************
     # Prediction step 
     # ******************************
@@ -84,11 +87,11 @@ function KalmanFilter!(m::dlm,y,x)
 
     # Ensure Y vector is y[vars,time]
     if m.k > 1
-        reshape(y, m.k, 1)
+        reshape(y[t], m.k, 1)
     end
 
     # Prediction error
-    prediction.error = (y-.transpose(A)*X-.transpose(H)*ξ_p1)
+    prediction.error = (y[t]-.transpose(A)*x-.transpose(H)*ξ_p1)
 
     # Prediction variance
     HΣHR = transpose(H)*Σ_p1*H + R
@@ -97,6 +100,8 @@ function KalmanFilter!(m::dlm,y,x)
     # Filtered step 
     # ******************************
     
+
+
     # Kalman Gain
     Gain = (Σ_p1*H)/(HΣHR)
 
