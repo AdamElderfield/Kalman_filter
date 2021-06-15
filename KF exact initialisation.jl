@@ -51,7 +51,7 @@ end
  # TODO: Expand to inlcude x and y?
 function dlm(A, FF, Q, R, H)
     k = size(H, 2)   # Number of y variables (columns of H as it is transposed)
-    n = size(H, 1)   # Number of states (ros of H as it is transposed
+    n = size(H, 1)   # Number of states (row of H as it is transposed
     ξ = n == 1 ? zero(eltype(FF)) : zeros(n)                    # IF n == 1 then 0, else zeros[n,1]
     Σ = n == 1 ? zero(eltype(FF)) : zeros(n, n)                 # IF n == 1 then 0, else zeros[n,n]   
     return dlm(A, FF, Q, R, H, k, n, ξ, Σ)
@@ -74,21 +74,41 @@ end
 # y_t = A'x_t + H'ξ_t + v_t
 # Assumes states have been initialised
 
-function KalmanFilter!(m::dlm,y::AbstractArray, x::AbstractArray)
+function KalmanFilter(m::dlm,y::AbstractArray, x = "NA")
+
     FF, A, H, Q = m.FF, m.A, m.H, m.Q
-    ξ_p1 , Σ_pi = m.cur_ξ_hat, m.cur_Σ_hat 
+      
+    k, n, = m.k, m.n
+    
+    # *********************************
+    # Initialisation of matrices
+    # *********************************
 
     # Number of time periods
-    bigT = size(y,1)
+    T = size(y,1)
+
+    ξ_f = zeros(T,n)
+    Σ_f = zeros(n,n,T)
     
-    for t= 1:bigT
+    ξ_f[1,n] = m.cur_ξ_hat
+    Σ_f[n,n,1] = m.cur_Σ_hat
+
+    ξ_p = zeros(T,n)
+    Σ_p = zeros(n,n,T)
+
+    if x == "NA"
+        x = zeros(T,1)
+    end    
+    
+    for t= 1:T
 
         # ******************************
         # Prediction step 
         # ******************************
             
-        ξ_p1 = FF*ξ_f1     
-        Σ_p1 = FF*Σ_f1*transpose(FF) + Q
+        ξ_p[t,:] = FF*ξ_f[t,n]     
+        
+        Σ_p[:,:,t] = FF*Σ_f[n,n,t]*transpose(FF) + Q
 
         # Ensure Y vector is y[vars,time]
         if m.k > 1
@@ -99,26 +119,28 @@ function KalmanFilter!(m::dlm,y::AbstractArray, x::AbstractArray)
         Hp = transpose(H)
         Ap = transpose(A)
 
-        prediction.error = (y[t]-Ap*x[t]-Hp*ξ_p1)
+        prediction_error = (y[t].-Ap*x[t].-Hp*Σ_p[n,n,t])
 
         # Prediction variance
-        HΣHR = transpose(H)*Σ_p1*H + R
+        HΣHR = transpose(H)*Σ_p[n,n,t]*H .+ R
 
         # ******************************
         # Filtered step 
         # ******************************
         
         # Kalman Gain
-        Gain = (Σ_p1*H)/(HΣHR)
+        Gain = (Σ_p[n,n,t]*H)/(HΣHR)
 
         # Filtered mean
-        m.cur_ξ_hat  = ξ_p1 + Gain*prediction.error
+        ξ_f[t,:]  = ξ_p[t,n] .+ Gain*prediction_error
 
         # Filtered variance
-        m.cur_Σ_hat = Σ_p1 - Gain*H*Σ_p1
+        Σ_f[:,:,t] = Σ_p[n,n,t] .- Gain*H*Σ_p[n,n,t]
 
     end    
   
+    return ξ_p,Σ_p,ξ_f,Σ_f
+
 end
 
 
@@ -132,11 +154,11 @@ dat =  DataFrame(XLSX.readtable("C:/Users/aelde/OneDrive/Documents/GitHub/Tutori
  # ξ_t = FFξ_(t-1) + Qw_t
  #  y_t = A'x_t + H'ξ_t + Rv_t 
 
- A = [0]
- H = [1]
- FF = [1]
- Q = [100]
- R = [1000]
+ A = [0.0]
+ H = [1.0]
+ FF = [1.0]
+ Q = [100.0]
+ R = [1000.0]
 
 mod1= dlm(FF,A,H,Q,R)
-KalmanFilter!(mod1,dat[:,1],)
+a =KalmanFilter(mod1,dat[:,1])
