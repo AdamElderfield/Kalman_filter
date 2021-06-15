@@ -5,6 +5,11 @@ using DataFrames
 using Optim 
 using LinearAlgebra
 
+
+import XLSX
+
+
+
 # ---------------------------------------------------------
 # Function 1 - initialisation
 # Function 1 - Kalman filter recursions
@@ -69,48 +74,69 @@ end
 # y_t = A'x_t + H'ξ_t + v_t
 # Assumes states have been initialised
 
-function KalmanFilter!(m::dlm,y::AbstractArray,x::AbstractArray)
-
- 
-    FF, A, H, X, Q = m.FF, m.A, m.H, m.Q
+function KalmanFilter!(m::dlm,y::AbstractArray, x::AbstractArray)
+    FF, A, H, Q = m.FF, m.A, m.H, m.Q
     ξ_p1 , Σ_pi = m.cur_ξ_hat, m.cur_Σ_hat 
 
     # Number of time periods
     bigT = size(y,1)
-         
-    # ******************************
-    # Prediction step 
-    # ******************************
-           
-    ξ_p1 = FF*ξ_f1     
-    Σ_p1 = FF*Σ_f1*transpose(FF) + Q
-
-    # Ensure Y vector is y[vars,time]
-    if m.k > 1
-        reshape(y[t], m.k, 1)
-    end
-
-    # Prediction error
-    prediction.error = (y[t]-.transpose(A)*x-.transpose(H)*ξ_p1)
-
-    # Prediction variance
-    HΣHR = transpose(H)*Σ_p1*H + R
-
-    # ******************************
-    # Filtered step 
-    # ******************************
     
+    for t= 1:bigT
 
+        # ******************************
+        # Prediction step 
+        # ******************************
+            
+        ξ_p1 = FF*ξ_f1     
+        Σ_p1 = FF*Σ_f1*transpose(FF) + Q
 
-    # Kalman Gain
-    Gain = (Σ_p1*H)/(HΣHR)
+        # Ensure Y vector is y[vars,time]
+        if m.k > 1
+            reshape(y[t], m.k, 1)
+        end
 
-    # Filtered mean
-    m.cur_ξ_hat  = ξ_p1 + Gain*prediction.error
+        # Prediction error
+        Hp = transpose(H)
+        Ap = transpose(A)
 
-    # Filtered variance
-    m.cur_Σ_hat = Σ_p1 - Gain*H*Σ_p1
+        prediction.error = (y[t]-Ap*x[t]-Hp*ξ_p1)
 
+        # Prediction variance
+        HΣHR = transpose(H)*Σ_p1*H + R
+
+        # ******************************
+        # Filtered step 
+        # ******************************
+        
+        # Kalman Gain
+        Gain = (Σ_p1*H)/(HΣHR)
+
+        # Filtered mean
+        m.cur_ξ_hat  = ξ_p1 + Gain*prediction.error
+
+        # Filtered variance
+        m.cur_Σ_hat = Σ_p1 - Gain*H*Σ_p1
+
+    end    
   
 end
 
+
+
+
+# Nile river data for testing
+dat =  DataFrame(XLSX.readtable("C:/Users/aelde/OneDrive/Documents/GitHub/Tutorials/State space models/NileDat.xlsx","Sheet1")...)
+
+
+# Sets up dlm, given system matrices
+ # ξ_t = FFξ_(t-1) + Qw_t
+ #  y_t = A'x_t + H'ξ_t + Rv_t 
+
+ A = [0]
+ H = [1]
+ FF = [1]
+ Q = [100]
+ R = [1000]
+
+mod1= dlm(FF,A,H,Q,R)
+KalmanFilter!(mod1,dat[:,1],)
