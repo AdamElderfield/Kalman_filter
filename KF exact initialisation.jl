@@ -104,21 +104,21 @@ function KalmanFilter(m::dlm,y::AbstractArray, x = "NA")
         # ******************************
         # Prediction step 
         # ******************************
-       # t = 1
+        #t = 1
         #--------------------------------
         # Conditional initialses the filter with priors if t = 1
         #--------------------------------
         if t ==1
 
-            ξ_p[t,:] = FF[:,:]*m.cur_ξ_hat 
+            ξ_p[t,:] = FF[n,n]*m.cur_ξ_hat 
         
-            Σ_p[:,:,t] = FF[:,:]*m.cur_Σ_hat*transpose(FF[:,:]) + Q[:,:]
+            Σ_p[:,:,t] = FF[n,n]*m.cur_Σ_hat*transpose(FF[n,n]) .+ Q[n,n]
 
         else    
 
             ξ_p[t,:] = FF[:,:]*ξ_f[t-1,:]     
             
-            Σ_p[:,:,t] = FF[:,:]*Σ_f[:,:,t-1]*transpose(FF[:,:]) + Q[:,:]
+            Σ_p[:,:,t] = FF[:,:]*Σ_f[:,:,t-1]*transpose(FF[:,:]) .+ Q[:,:]
 
         end
 
@@ -132,7 +132,7 @@ function KalmanFilter(m::dlm,y::AbstractArray, x = "NA")
         Hp = transpose(H)
         Ap = transpose(A)
 
-        prediction_error = (y[t].-Ap[:,:]*x[t].-Hp[:,:]*ξ_p[t])
+        prediction_error = (y[t].-Ap[:,:]*x[t].-Hp[:,:]*ξ_p[t,:])
 
         # Prediction variance
         HΣHR = transpose(H[:,:])*Σ_p[:,:,t]*H[:,:] .+ R[:,:]
