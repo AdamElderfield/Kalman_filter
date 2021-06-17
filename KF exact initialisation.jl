@@ -75,8 +75,8 @@ end
 # Assumes states have been initialised
 
 function KalmanFilter(m::dlm,y::AbstractArray, x = "NA")
-
-    FF, A, H, Q = m.FF, m.A, m.H, m.Q
+   # m =mod1
+    FF, A, H, Q, R = m.FF, m.A, m.H, m.Q, m.R
       
     k, n, = m.k, m.n
     
@@ -90,8 +90,8 @@ function KalmanFilter(m::dlm,y::AbstractArray, x = "NA")
     ξ_f = zeros(T,n)
     Σ_f = zeros(n,n,T)
     
-    ξ_f[1,n] = m.cur_ξ_hat
-    Σ_f[n,n,1] = m.cur_Σ_hat
+   # ξ_f[1,n] = m.cur_ξ_hat
+   # Σ_f[n,n,1] = m.cur_Σ_hat
 
     ξ_p = zeros(T,n)
     Σ_p = zeros(n,n,T)
@@ -101,14 +101,27 @@ function KalmanFilter(m::dlm,y::AbstractArray, x = "NA")
     end    
     
     for t= 1:T
-
+       
         # ******************************
         # Prediction step 
         # ******************************
-            
-        ξ_p[t,:] = FF*ξ_f[t,n]     
         
-        Σ_p[:,:,t] = FF*Σ_f[n,n,t]*transpose(FF) + Q
+        #--------------------------------
+        # Conditional initialses the filter with priors if t = 1
+        #--------------------------------
+        if t ==1
+
+            ξ_p[t,:] = FF[:,:]*m.cur_ξ_hat 
+        
+            Σ_p[:,:,t] = FF[:,:]*m.cur_Σ_hat*transpose(FF[:,:]) + Q[:,:]
+
+        else    
+
+            ξ_p[t,:] = FF[:,:]*ξ_f[t-1,:]     
+            
+            Σ_p[:,:,t] = FF[:,:]*Σ_f[:,:,t-1]*transpose(FF[:,:]) + Q[:,:]
+
+        end
 
         # Ensure Y vector is y[vars,time]
         if m.k > 1
@@ -119,23 +132,23 @@ function KalmanFilter(m::dlm,y::AbstractArray, x = "NA")
         Hp = transpose(H)
         Ap = transpose(A)
 
-        prediction_error = (y[t].-Ap*x[t].-Hp*Σ_p[n,n,t])
+        prediction_error = (y[t].-Ap[:,:]*x[t].-Hp[:,:]*ξ_p[t])
 
         # Prediction variance
-        HΣHR = transpose(H)*Σ_p[n,n,t]*H .+ R
+        HΣHR = transpose(H[:,:])*Σ_p[:,:,t]*H[:,:] .+ R[:,:]
 
         # ******************************
         # Filtered step 
         # ******************************
         
         # Kalman Gain
-        Gain = (Σ_p[n,n,t]*H)/(HΣHR)
+        Gain = (Σ_p[:,:,t]*H[:,:])/(HΣHR[:,:])
 
         # Filtered mean
-        ξ_f[t,:]  = ξ_p[t,n] .+ Gain*prediction_error
+        ξ_f[t,:]  = ξ_p[t,:] .+ Gain[:,:]*prediction_error[:,:]
 
         # Filtered variance
-        Σ_f[:,:,t] = Σ_p[n,n,t] .- Gain*H*Σ_p[n,n,t]
+        Σ_f[:,:,t] = Σ_p[:,:,t] .- Gain[:,:]*H[:,:]*Σ_p[:,:,t]
 
     end    
   
@@ -157,8 +170,11 @@ dat =  DataFrame(XLSX.readtable("C:/Users/aelde/OneDrive/Documents/GitHub/Tutori
  A = [0.0]
  H = [1.0]
  FF = [1.0]
- Q = [100.0]
- R = [1000.0]
+ Q = [1469.1]
+ R = [15099.0]
 
 mod1= dlm(FF,A,H,Q,R)
+initialise!(mod1,0,100000)
 a =KalmanFilter(mod1,dat[:,1])
+a[3]
+plot([a[3],y])
