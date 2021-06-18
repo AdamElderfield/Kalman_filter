@@ -129,20 +129,20 @@ function KalmanFilter(m::dlm,y::AbstractArray, x = "NA")
 
         # Matrix size error here!
         # Prediction error
-        Hp = transpose(H)
-        Ap = transpose(A)
+        Hᵗ = transpose(H)
+        Aᵗ = transpose(A)
 
-        prediction_error = (y[t].-Ap[:,:]*x[t].-Hp[:,:]*ξ_p[t,:])
+        prediction_error = (y[t].-Aᵗ[:,:]*x[t].-Hᵗ[:,:]*ξ_p[t,:])
 
         # Prediction variance
-        HΣHR = transpose(H[:,:])*Σ_p[:,:,t]*H[:,:] .+ R[:,:]
+        HᵗΣHR = Hᵗ[:,:]*Σ_p[:,:,t]*H[:,:] .+ R[:,:]
 
         # ******************************
         # Filtered step 
         # ******************************
         
         # Kalman Gain
-        Gain = (Σ_p[:,:,t]*H[:,:])/(HΣHR[:,:])
+        Gain = (Σ_p[:,:,t]*H[:,:])/(HᵗΣHR[:,:])
 
         # Filtered mean
         ξ_f[t,:]  = ξ_p[t,:] .+ Gain[:,:]*prediction_error[:,:]
